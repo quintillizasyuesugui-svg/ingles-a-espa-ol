@@ -52,7 +52,11 @@ def traducir():
     try:
         respuesta = requests.get(
             URL_API_TRADUCCION,
-            params={"q": texto, "langpair": "es|en"},
+            # El parámetro "de" (un contacto, no hace falta que sea real) le
+            # sube el límite diario gratis a MyMemory. Sin esto, la IP
+            # compartida de un plan gratis de hosting puede toparse con el
+            # límite anónimo mucho más rápido.
+            params={"q": texto, "langpair": "es|en", "de": "traductor-voz@example.com"},
             timeout=10,
         )
         respuesta.raise_for_status()
