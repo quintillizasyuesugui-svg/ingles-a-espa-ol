@@ -5,9 +5,16 @@ Página web que traduce lo que hablas en español al inglés y lo lee en voz alt
 ## Cómo funciona
 
 1. Tocas el micrófono y hablas en español. El navegador (Web Speech API) va mostrando el texto en vivo.
-2. A los 3 segundos de silencio, el texto se envía al servidor, que lo traduce con el modelo `Helsinki-NLP/opus-mt-es-en` (MarianMT).
-3. La traducción se muestra en pantalla y se escucha automáticamente en inglés, con una voz masculina neuronal (edge-tts).
+2. A los 3 segundos de silencio, el texto se envía al servidor, que lo traduce con el modelo `Helsinki-NLP/opus-mt-es-en` (MarianMT), cargado localmente — **sin API externa**.
+3. La traducción se muestra en pantalla y se escucha automáticamente en inglés, con una voz masculina neuronal generada por la **API de edge-tts**.
 4. Si el reconocimiento de voz se traba, hay un botón manual **"🔁 Traducir ahora"** que fuerza la traducción de inmediato.
+
+También hay dos botones independientes para probar cada función por separado:
+
+- **Traducir** → llama solo a `/api/traducir`. Esta función **no usa ninguna API**: el modelo de traducción corre dentro del propio servidor.
+- **🔊 Escuchar** → llama solo a `/api/hablar`. Esta función **sí usa una API externa** (edge-tts, el servicio de voz de Microsoft Edge).
+
+Así el proyecto tiene, a propósito, una función sin API y otra con API, cada una con su propio botón.
 
 ## Estructura del proyecto
 
@@ -17,7 +24,7 @@ requirements.txt           dependencias de Python
 plantillas/index.html      página web
 estaticos/css/estilos.css  estilos y animaciones
 estaticos/js/script.js     micrófono, temporizador y reproducción
-render.yaml                configuración para desplegar en Render
+Procfile                   comando de arranque para desplegar en Railway
 ```
 
 ## Correrlo en tu computadora
@@ -31,18 +38,19 @@ python app.py
 
 Abre `http://127.0.0.1:5000/` en Google Chrome o Microsoft Edge (el reconocimiento de voz del navegador no funciona en todos los navegadores, por ejemplo Firefox no lo soporta).
 
-## Desplegarlo en Render
+## Desplegarlo en Railway
 
-Este repositorio ya incluye `render.yaml`, así que Render puede configurar el servicio solo:
+Este repositorio ya incluye un `Procfile`, así que Railway puede configurar el servicio solo:
 
-1. Entra a [render.com](https://render.com) y conecta tu cuenta de GitHub.
-2. **New +** → **Blueprint** → elige este repositorio.
-3. Render lee `render.yaml` y crea el servicio automáticamente (instala las dependencias y arranca con `gunicorn`).
-4. Cuando termine el build, te da una URL pública en `https://tu-servicio.onrender.com`.
+1. Entra a [railway.app](https://railway.app) y conecta tu cuenta de GitHub.
+2. **New Project** → **Deploy from GitHub repo** → elige este repositorio.
+3. Railway detecta que es un proyecto Python (usa la versión de `.python-version`), instala `requirements.txt` y arranca con el comando del `Procfile` (`gunicorn`).
+4. En la pestaña **Settings** → **Networking**, genera un dominio público para poder abrir la página desde internet.
 
-**Importante sobre el plan gratuito de Render:** este proyecto carga un modelo de traducción (PyTorch + Transformers) en memoria, lo que pesa más que una página web normal. El plan gratuito tiene poca RAM (512 MB) y puede quedarse sin memoria o tardar bastante en arrancar la primera vez. Si el despliegue falla o se cae, prueba con un plan de pago con más memoria (1–2 GB).
+**Importante sobre memoria:** este proyecto carga un modelo de traducción (PyTorch + Transformers) en memoria, lo que pesa más que una página web normal. Si el plan que uses en Railway tiene poca RAM, el despliegue puede quedarse sin memoria o tardar bastante en arrancar la primera vez. Si eso pasa, prueba con un plan con más memoria (1–2 GB).
 
 ## Notas
 
-- La voz en inglés usa el servicio gratuito de Microsoft Edge (edge-tts), que necesita internet.
+- La traducción corre localmente en el servidor (modelo `Helsinki-NLP/opus-mt-es-en`, sin API externa ni conexión a internet para traducir).
+- La voz en inglés usa el servicio gratuito de Microsoft Edge (edge-tts), que sí necesita internet.
 - El servidor no graba ni guarda audio de tu voz: el reconocimiento en español ocurre en el navegador, y el audio de la traducción se genera al vuelo y se borra después de enviarlo.

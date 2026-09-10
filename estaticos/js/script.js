@@ -21,6 +21,7 @@ const barraProgreso = document.getElementById("barra-progreso");
 const botonForzar = document.getElementById("boton-forzar");
 const botonCopiarEs = document.getElementById("boton-copiar-es");
 const botonCopiarEn = document.getElementById("boton-copiar-en");
+const botonEscuchar = document.getElementById("boton-escuchar");
 
 let escuchando = false;
 let reconocimiento = null;
@@ -93,6 +94,50 @@ function ponerEstado(texto) {
   reiniciarAnimacion(estado);
 }
 
+// Estas dos funciones son las únicas que hablan con el servidor: una llama
+// a /api/traducir y la otra a /api/hablar. Cada botón de la página usa una
+// sola de las dos, para que quede claro que son dos funciones separadas.
+async function traducirTexto(texto) {
+  const respuesta = await fetch("/api/traducir", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ texto }),
+  });
+
+  if (!respuesta.ok) {
+    throw new Error("No se pudo traducir el texto.");
+  }
+
+  const datos = await respuesta.json();
+  return datos.ingles;
+}
+
+async function pedirAudio(texto) {
+  const respuesta = await fetch("/api/hablar", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ texto }),
+  });
+
+  if (!respuesta.ok) {
+    throw new Error("No se pudo generar el audio.");
+  }
+
+  return respuesta.blob();
+}
+
+function reproducirBloqueAudio(bloqueAudio) {
+  const url = URL.createObjectURL(bloqueAudio);
+  const audio = new Audio(url);
+  audio.addEventListener("ended", () => {
+    URL.revokeObjectURL(url);
+    ponerEstado(escuchando ? "Escuchando…" : "Toca el micrófono para hablar");
+  });
+  return audio.play();
+}
+
+// Flujo automático: al hablar por el micrófono, traduce y reproduce el audio
+// seguido, sin que el usuario tenga que tocar ningún botón.
 async function procesarFrase(textoEspanolFinal) {
   if (!textoEspanolFinal || !textoEspanolFinal.trim() || procesando) return;
   procesando = true;
@@ -102,41 +147,16 @@ async function procesarFrase(textoEspanolFinal) {
   barraProgreso.hidden = false;
 
   try {
-    const respuestaTraduccion = await fetch("/api/traducir", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ texto: textoEspanolFinal }),
-    });
-
-    if (!respuestaTraduccion.ok) {
-      throw new Error("No se pudo traducir el texto.");
-    }
-
-    const datos = await respuestaTraduccion.json();
-    actualizarPanel(textoIngles, datos.ingles, "Translation will appear here…", botonCopiarEn);
+    const ingles = await traducirTexto(textoEspanolFinal);
+    actualizarPanel(textoIngles, ingles, "Translation will appear here…", botonCopiarEn);
+    botonEscuchar.disabled = false;
 
     ponerEstado("Generando audio…");
-    const respuestaAudio = await fetch("/api/hablar", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ texto: datos.ingles }),
-    });
-
-    if (!respuestaAudio.ok) {
-      throw new Error("No se pudo generar el audio.");
-    }
-
-    const bloqueAudio = await respuestaAudio.blob();
-    const url = URL.createObjectURL(bloqueAudio);
-    const audio = new Audio(url);
+    const bloqueAudio = await pedirAudio(ingles);
 
     barraProgreso.hidden = true;
     ponerEstado("Reproduciendo…");
-    audio.addEventListener("ended", () => {
-      URL.revokeObjectURL(url);
-      ponerEstado(escuchando ? "Escuchando…" : "Toca el micrófono para hablar");
-    });
-    await audio.play();
+    await reproducirBloqueAudio(bloqueAudio);
   } catch (error) {
     mostrarError(error.message || "Ocurrió un error al procesar la frase.");
     ponerEstado(escuchando ? "Escuchando…" : "Toca el micrófono para hablar");
@@ -255,13 +275,58 @@ botonMic.addEventListener("click", () => {
   }
 });
 
-formularioManual.addEventListener("submit", (evento) => {
+// Botón "Traducir": llama solo a la función/API de traducción y muestra el
+// resultado. No reproduce audio por su cuenta.
+formularioManual.addEventListener("submit", async (evento) => {
   evento.preventDefault();
   const texto = entradaTexto.value.trim();
-  if (!texto) return;
+  if (!texto || procesando) return;
+
   actualizarPanel(textoEspanol, texto, "Aquí aparecerá lo que digas…", botonCopiarEs);
   entradaTexto.value = "";
-  procesarFrase(texto);
+
+  procesando = true;
+  ocultarError();
+  ponerEstado("Traduciendo…");
+  botonTraducir.disabled = true;
+  botonEscuchar.disabled = true;
+
+  try {
+    const ingles = await traducirTexto(texto);
+    actualizarPanel(textoIngles, ingles, "Translation will appear here…", botonCopiarEn);
+    botonEscuchar.disabled = false;
+    ponerEstado("Toca 🔊 Escuchar para oír la traducción");
+  } catch (error) {
+    mostrarError(error.message || "Ocurrió un error al traducir.");
+    ponerEstado(escuchando ? "Escuchando…" : "Toca el micrófono para hablar");
+  } finally {
+    procesando = false;
+    botonTraducir.disabled = false;
+  }
+});
+
+// Botón "🔊 Escuchar": llama solo a la función/API de voz, con el texto en
+// inglés que ya esté en pantalla (sin volver a traducir).
+botonEscuchar.addEventListener("click", async () => {
+  if (textoIngles.classList.contains("panel-texto-vacio") || procesando) return;
+  const texto = textoIngles.textContent;
+
+  procesando = true;
+  ocultarError();
+  ponerEstado("Generando audio…");
+  botonEscuchar.disabled = true;
+
+  try {
+    const bloqueAudio = await pedirAudio(texto);
+    ponerEstado("Reproduciendo…");
+    await reproducirBloqueAudio(bloqueAudio);
+  } catch (error) {
+    mostrarError(error.message || "Ocurrió un error al generar el audio.");
+    ponerEstado(escuchando ? "Escuchando…" : "Toca el micrófono para hablar");
+  } finally {
+    procesando = false;
+    botonEscuchar.disabled = false;
+  }
 });
 
 // Botón de respaldo: por si el temporizador de 3 segundos se traba o el

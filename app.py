@@ -3,13 +3,15 @@ Traductor por voz Español -> Inglés
 ------------------------------------
 Servidor Flask que expone dos endpoints:
   - /api/traducir : recibe texto en español y devuelve la traducción al inglés
-                     (modelo Helsinki-NLP/opus-mt-es-en, vía MarianMT).
+                     (modelo Helsinki-NLP/opus-mt-es-en, vía MarianMT). Corre
+                     localmente en el servidor, sin ninguna API externa.
   - /api/hablar    : recibe texto en inglés y devuelve un audio con voz
-                     masculina neuronal (edge-tts).
+                     masculina neuronal, generado por la API de edge-tts.
 
 El micrófono y el reconocimiento de voz en español ocurren en el navegador
 (Web Speech API), en estaticos/js/script.js. Este servidor no graba audio:
-solo traduce texto y genera el audio de salida en inglés.
+solo traduce texto (localmente) y genera el audio de salida en inglés
+(con la API de edge-tts).
 """
 
 import asyncio
@@ -24,7 +26,6 @@ from transformers import MarianMTModel, MarianTokenizer
 app = Flask(__name__, template_folder="plantillas", static_folder="estaticos")
 app.config["TEMPLATES_AUTO_RELOAD"] = True  # para que index.html se recargue sin reiniciar el servidor
 
-# ---------- Esto de aquí es igual al código original ----------
 NOMBRE_MODELO = "Helsinki-NLP/opus-mt-es-en"
 
 print("Cargando modelo de traducción español -> inglés (solo la primera vez tarda más)...")
@@ -32,9 +33,7 @@ tokenizador = MarianTokenizer.from_pretrained(NOMBRE_MODELO)
 modelo = MarianMTModel.from_pretrained(NOMBRE_MODELO)
 modelo.generation_config.max_length = None  # evita el aviso: max_new_tokens ya define el límite
 print("Modelo de traducción listo.")
-# ---------- Hasta aquí llega el código original ----------
 
-# ---------- De aquí para abajo es distinto ----------
 # El modelo de traducción y el motor de voz no son seguros para usarse desde
 # varios hilos a la vez, así que cada uno tiene su propio candado.
 candado_traduccion = threading.Lock()
@@ -56,14 +55,12 @@ def traducir():
         return jsonify({"error": "El texto está vacío."}), 400
 
     with candado_traduccion:
-        # ---------- Esto de aquí es igual al código original ----------
         entrada = tokenizador(texto, return_tensors="pt", truncation=True)
         salida = modelo.generate(
             **entrada,
             max_new_tokens=60,
-            # ---------- Hasta aquí llega el código original ----------
-            # Estos parámetros de aquí para abajo evitan que la traducción
-            # se trabe repitiendo una palabra en frases poco comunes.
+            # Estos parámetros evitan que la traducción se trabe repitiendo
+            # una palabra en frases poco comunes.
             num_beams=4,
             no_repeat_ngram_size=3,
             repetition_penalty=1.3,
@@ -105,7 +102,7 @@ def hablar():
 
 
 if __name__ == "__main__":
-    # Render (y la mayoría de plataformas en la nube) asignan el puerto por
+    # Railway (y la mayoría de plataformas en la nube) asignan el puerto por
     # la variable de entorno PORT y hay que escuchar en 0.0.0.0, no en
     # 127.0.0.1. En tu computadora, sin esa variable, sigue usando el 5000.
     puerto = int(os.environ.get("PORT", 5000))
