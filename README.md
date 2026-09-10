@@ -29,7 +29,7 @@ requirements.txt           dependencias de Python
 plantillas/index.html      página web
 estaticos/css/estilos.css  estilos y animaciones
 estaticos/js/script.js     micrófono, temporizador y reproducción
-render.yaml                configuración para desplegar en Render
+Procfile                   comando de arranque para desplegar en Railway
 ```
 
 ## Correrlo en tu computadora
@@ -43,16 +43,16 @@ python app.py
 
 Abre `http://127.0.0.1:5000/` en Google Chrome o Microsoft Edge (el reconocimiento de voz del navegador no funciona en todos los navegadores, por ejemplo Firefox no lo soporta).
 
-## Desplegarlo en Render
+## Desplegarlo en Railway
 
-Este repositorio ya incluye `render.yaml`, así que Render puede configurar el servicio solo:
+Este repositorio ya incluye un `Procfile`, así que Railway puede configurar el servicio solo:
 
-1. Entra a [render.com](https://render.com) y conecta tu cuenta de GitHub.
-2. **New +** → **Blueprint** → elige este repositorio (tiene que ser "Blueprint", no "Web Service", para que Render lea `render.yaml`).
-3. Render lee `render.yaml` y crea el servicio automáticamente (instala las dependencias, descarga el modelo durante el build, y arranca con `gunicorn`).
-4. Cuando termine el build, te da una URL pública en `https://tu-servicio.onrender.com`.
+1. Entra a [railway.app](https://railway.app) y conecta tu cuenta de GitHub.
+2. **New Project** → **Deploy from GitHub repo** → elige este repositorio.
+3. Railway detecta que es un proyecto Python (usa la versión de `.python-version`), instala `requirements.txt` y arranca con el comando del `Procfile` (`gunicorn`).
+4. En la pestaña **Settings** → **Networking**, genera un dominio público para poder abrir la página desde internet.
 
-**Importante sobre memoria:** este proyecto carga un modelo de traducción (PyTorch + Transformers) en memoria, lo que pesa bastante más que una página web normal. El plan gratuito de Render tiene poca RAM (512 MB) y puede quedarse sin memoria o tardar bastante en arrancar la primera vez. Si el despliegue falla por "Out of memory", hay que subir a un plan de pago con más RAM (por ejemplo el plan Standard, con 2 GB) desde **Settings** del servicio en Render.
+**Importante sobre memoria:** este proyecto carga un modelo de traducción (PyTorch + Transformers) en memoria, lo que pesa bastante más que una página web normal. Si el plan de Railway que uses tiene poca RAM, el despliegue puede quedarse sin memoria o tardar bastante en arrancar la primera vez.
 
 ## Notas
 
