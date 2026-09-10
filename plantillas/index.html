@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Traductor por Voz</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/estilos.css') }}" />
+</head>
+<body>
+  <div class="fondo" aria-hidden="true"></div>
+
+  <main class="contenedor">
+    <header class="encabezado">
+      <h1>Traductor por voz</h1>
+      <p class="subtitulo">Habla en español y escúchalo traducido al inglés, con voz masculina</p>
+    </header>
+
+    <section class="tarjeta">
+      <div class="panel-mic">
+        <button id="boton-mic" class="boton-mic" type="button" aria-pressed="false">
+          <span class="anillo anillo-1" aria-hidden="true"></span>
+          <span class="anillo anillo-2" aria-hidden="true"></span>
+          <svg class="icono-mic" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M19 11a7 7 0 0 1-14 0M12 18v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <p id="estado" class="estado">Toca el micrófono para hablar</p>
+        <div id="barra-progreso" class="barra-progreso" hidden>
+          <div class="barra-progreso-relleno"></div>
+        </div>
+        <p class="ayuda">Se traduce y se escucha automáticamente tras 3 segundos de silencio</p>
+        <button id="boton-forzar" class="boton-secundario boton-forzar" type="button">
+          🔁 Traducir ahora
+        </button>
+      </div>
+
+      <div class="paneles">
+        <div class="panel panel-es">
+          <div class="panel-cabecera">
+            <span class="panel-cabecera-etiqueta">
+              <span class="bandera">🇪🇸</span>
+              <span>Español</span>
+            </span>
+            <button id="boton-copiar-es" class="boton-copiar" type="button" disabled aria-label="Copiar el texto en español">⧉</button>
+          </div>
+          <p id="texto-espanol" class="panel-texto panel-texto-vacio">Aquí aparecerá lo que digas…</p>
+        </div>
+
+        <div class="flecha" aria-hidden="true">→</div>
+
+        <div class="panel panel-en">
+          <div class="panel-cabecera">
+            <span class="panel-cabecera-etiqueta">
+              <span class="bandera">🇬🇧</span>
+              <span>English</span>
+            </span>
+            <button id="boton-copiar-en" class="boton-copiar" type="button" disabled aria-label="Copiar el texto en inglés">⧉</button>
+          </div>
+          <p id="texto-ingles" class="panel-texto panel-texto-vacio">Translation will appear here…</p>
+        </div>
+      </div>
+
+      <form id="formulario-manual" class="entrada-manual">
+        <input
+          id="entrada-texto"
+          type="text"
+          placeholder="…o escribe una frase en español"
+          autocomplete="off"
+        />
+        <button id="boton-traducir" class="boton-secundario" type="submit">Traducir</button>
+      </form>
+    </section>
+
+    <p id="mensaje-error" class="mensaje-error" hidden></p>
+  </main>
+
+  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>

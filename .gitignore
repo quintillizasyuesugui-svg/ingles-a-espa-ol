@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Modelos descargados (se vuelven a descargar solos con transformers)
+.cache/
+*.mp3
+*.wav
+
+# Logs y archivos locales de prueba
+servidor_log*.txt
+install_log.txt
+
+# Editor / SO
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
