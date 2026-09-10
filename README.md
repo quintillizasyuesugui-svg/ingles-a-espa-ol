@@ -14,7 +14,12 @@ También hay dos botones independientes para probar cada función por separado:
 - **Traducir** → llama solo a `/api/traducir`. Esta función **no usa ninguna API**: el modelo de traducción corre dentro del propio servidor.
 - **🔊 Escuchar** → llama solo a `/api/hablar`. Esta función **sí usa una API externa** (edge-tts, el servicio de voz de Microsoft Edge).
 
-Así el proyecto tiene, a propósito, una función sin API y otra con API, cada una con su propio botón.
+Junto al botón "🔊 Escuchar" hay un **interruptor 🔌 "API de voz"**:
+
+- **Activado (por defecto):** al escuchar, sí se llama a la API de edge-tts y se reproduce el audio.
+- **Desactivado:** no se llama a la API — ni el botón "Escuchar" ni el flujo automático del micrófono reproducen audio, y se avisa que la API está apagada.
+
+Así se puede mostrar en vivo la diferencia entre "con API" y "sin API" para la misma función, solo prendiendo o apagando el interruptor.
 
 ## Estructura del proyecto
 

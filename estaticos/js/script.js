@@ -22,6 +22,8 @@ const botonForzar = document.getElementById("boton-forzar");
 const botonCopiarEs = document.getElementById("boton-copiar-es");
 const botonCopiarEn = document.getElementById("boton-copiar-en");
 const botonEscuchar = document.getElementById("boton-escuchar");
+const interruptorVozApi = document.getElementById("interruptor-voz-api");
+const interruptorEstado = document.getElementById("interruptor-estado");
 
 let escuchando = false;
 let reconocimiento = null;
@@ -151,12 +153,19 @@ async function procesarFrase(textoEspanolFinal) {
     actualizarPanel(textoIngles, ingles, "Translation will appear here…", botonCopiarEn);
     botonEscuchar.disabled = false;
 
-    ponerEstado("Generando audio…");
-    const bloqueAudio = await pedirAudio(ingles);
+    // El interruptor "API de voz" decide si esta parte se ejecuta o no.
+    // Apagado, no se llama a la API y no se reproduce ningún audio.
+    if (interruptorVozApi.checked) {
+      ponerEstado("Generando audio…");
+      const bloqueAudio = await pedirAudio(ingles);
 
-    barraProgreso.hidden = true;
-    ponerEstado("Reproduciendo…");
-    await reproducirBloqueAudio(bloqueAudio);
+      barraProgreso.hidden = true;
+      ponerEstado("Reproduciendo…");
+      await reproducirBloqueAudio(bloqueAudio);
+    } else {
+      barraProgreso.hidden = true;
+      ponerEstado("API de voz apagada: no se reprodujo audio");
+    }
   } catch (error) {
     mostrarError(error.message || "Ocurrió un error al procesar la frase.");
     ponerEstado(escuchando ? "Escuchando…" : "Toca el micrófono para hablar");
@@ -309,6 +318,12 @@ formularioManual.addEventListener("submit", async (evento) => {
 // inglés que ya esté en pantalla (sin volver a traducir).
 botonEscuchar.addEventListener("click", async () => {
   if (textoIngles.classList.contains("panel-texto-vacio") || procesando) return;
+
+  if (!interruptorVozApi.checked) {
+    mostrarError("La API de voz está apagada. Actívala arriba (🔌) para poder escuchar.");
+    return;
+  }
+
   const texto = textoIngles.textContent;
 
   procesando = true;
@@ -327,6 +342,11 @@ botonEscuchar.addEventListener("click", async () => {
     procesando = false;
     botonEscuchar.disabled = false;
   }
+});
+
+// Actualiza la palabra "activada"/"desactivada" junto al interruptor.
+interruptorVozApi.addEventListener("change", () => {
+  interruptorEstado.textContent = interruptorVozApi.checked ? "activada" : "desactivada";
 });
 
 // Botón de respaldo: por si el temporizador de 3 segundos se traba o el
