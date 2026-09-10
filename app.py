@@ -1,42 +1,37 @@
 """
 Traductor por voz Español -> Inglés
 ------------------------------------
-Servidor Flask que expone dos endpoints:
-  - /api/traducir : recibe texto en español y devuelve la traducción al inglés
-                     (modelo Helsinki-NLP/opus-mt-es-en, vía MarianMT). Corre
-                     localmente en el servidor, sin ninguna API externa.
+Servidor Flask que expone dos endpoints, cada uno apoyado en una API externa:
+  - /api/traducir : recibe texto en español y devuelve la traducción al inglés,
+                     pidiéndosela a la API gratuita de MyMemory Translation.
   - /api/hablar    : recibe texto en inglés y devuelve un audio con voz
                      masculina neuronal, generado por la API de edge-tts.
 
 El micrófono y el reconocimiento de voz en español ocurren en el navegador
-(Web Speech API), en estaticos/js/script.js. Este servidor no graba audio:
-solo traduce texto (localmente) y genera el audio de salida en inglés
-(con la API de edge-tts).
+(Web Speech API), en estaticos/js/script.js. Este servidor no graba audio ni
+carga ningún modelo de IA en memoria: solo reenvía el texto a esas dos APIs
+y entrega la respuesta. (Antes la traducción corría con un modelo local,
+pero eso hacía que el servidor se quedara sin memoria en Render y en Railway,
+así que se volvió a una API para que el proyecto sea liviano en cualquier
+plataforma gratuita.)
 """
 
 import asyncio
+import html
 import os
 import tempfile
 import threading
 
 import edge_tts
+import requests
 from flask import Flask, jsonify, render_template, request, send_file
-from transformers import MarianMTModel, MarianTokenizer
 
 app = Flask(__name__, template_folder="plantillas", static_folder="estaticos")
 app.config["TEMPLATES_AUTO_RELOAD"] = True  # para que index.html se recargue sin reiniciar el servidor
 
-NOMBRE_MODELO = "Helsinki-NLP/opus-mt-es-en"
+URL_API_TRADUCCION = "https://api.mymemory.translated.net/get"
 
-print("Cargando modelo de traducción español -> inglés (solo la primera vez tarda más)...")
-tokenizador = MarianTokenizer.from_pretrained(NOMBRE_MODELO)
-modelo = MarianMTModel.from_pretrained(NOMBRE_MODELO)
-modelo.generation_config.max_length = None  # evita el aviso: max_new_tokens ya define el límite
-print("Modelo de traducción listo.")
-
-# El modelo de traducción y el motor de voz no son seguros para usarse desde
-# varios hilos a la vez, así que cada uno tiene su propio candado.
-candado_traduccion = threading.Lock()
+# El motor de voz no es seguro para usarse desde varios hilos a la vez.
 candado_voz = threading.Lock()
 
 VOZ_MASCULINA = "en-US-GuyNeural"  # voz neuronal gratuita de edge-tts
@@ -54,19 +49,28 @@ def traducir():
     if not texto:
         return jsonify({"error": "El texto está vacío."}), 400
 
-    with candado_traduccion:
-        entrada = tokenizador(texto, return_tensors="pt", truncation=True)
-        salida = modelo.generate(
-            **entrada,
-            max_new_tokens=60,
-            # Estos parámetros evitan que la traducción se trabe repitiendo
-            # una palabra en frases poco comunes.
-            num_beams=4,
-            no_repeat_ngram_size=3,
-            repetition_penalty=1.3,
-            early_stopping=True,
+    try:
+        respuesta = requests.get(
+            URL_API_TRADUCCION,
+            params={"q": texto, "langpair": "es|en"},
+            timeout=10,
         )
-        traduccion = tokenizador.decode(salida[0], skip_special_tokens=True)
+        respuesta.raise_for_status()
+        datos_api = respuesta.json()
+
+        estado = datos_api.get("responseStatus")
+        if estado not in (200, "200"):
+            raise ValueError(datos_api.get("responseDetails", "respuesta inesperada de la API"))
+
+        # MyMemory junta traducciones hechas por usuarios, así que a veces
+        # vienen con código HTML sin limpiar (por ejemplo "&#10;" en vez de
+        # un salto de línea real) o con saltos de línea/espacios de más.
+        # html.unescape() lo pasa a texto normal, y split()+join() lo deja
+        # todo en una sola línea.
+        traduccion_bruta = html.unescape(datos_api["responseData"]["translatedText"])
+        traduccion = " ".join(traduccion_bruta.split())
+    except (requests.RequestException, KeyError, ValueError) as error:
+        return jsonify({"error": f"No se pudo traducir el texto: {error}"}), 502
 
     return jsonify({"espanol": texto, "ingles": traduccion})
 
