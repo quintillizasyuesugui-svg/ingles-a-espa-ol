@@ -1,9 +1,4 @@
---extra-index-url https://download.pytorch.org/whl/cpu
-
 flask==3.0.3
 gunicorn==23.0.0
-transformers==5.17.0
-torch==2.14.0+cpu
-sentencepiece==0.2.2
-sacremoses==0.2.0
+requests==2.32.3
 edge-tts==7.2.8
