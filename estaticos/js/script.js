@@ -8,6 +8,7 @@
 //    soporta reconocimiento de voz o el usuario prefiere escribir.
 
 const MILISEGUNDOS_SILENCIO = 3000;
+const URL_API_TRADUCCION = "https://api.mymemory.translated.net/get";
 
 const botonMic = document.getElementById("boton-mic");
 const estado = document.getElementById("estado");
@@ -96,24 +97,45 @@ function ponerEstado(texto) {
   reiniciarAnimacion(estado);
 }
 
-// Estas dos funciones son las únicas que hablan con el servidor: una llama
-// a /api/traducir y la otra a /api/hablar. Cada botón de la página usa una
-// sola de las dos, para que quede claro que son dos funciones separadas.
-async function traducirTexto(texto) {
-  const respuesta = await fetch("/api/traducir", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ texto }),
-  });
+// MyMemory a veces devuelve código HTML sin limpiar (por ejemplo "&#10;" en
+// vez de un salto de línea real). Esto lo pasa a texto normal usando el
+// propio parser del navegador, y deja todo en una sola línea.
+function limpiarTraduccion(texto) {
+  const area = document.createElement("textarea");
+  area.innerHTML = texto;
+  return area.value.replace(/\s+/g, " ").trim();
+}
+
+// La traducción la pide el propio navegador directamente a la API de
+// MyMemory (en vez de pasar por nuestro servidor). Así cada visitante usa
+// su propia conexión a internet, y no comparte límite de uso con todos los
+// demás proyectos que corren en el mismo servicio de hosting.
+async function traducirTexto(texto, intento = 0) {
+  const url = new URL(URL_API_TRADUCCION);
+  url.searchParams.set("q", texto);
+  url.searchParams.set("langpair", "es|en");
+  url.searchParams.set("de", "traductor-voz@example.com");
+
+  const respuesta = await fetch(url);
 
   if (!respuesta.ok) {
+    if (respuesta.status === 429 && intento < 2) {
+      await new Promise((resolver) => setTimeout(resolver, 1500 * (intento + 1)));
+      return traducirTexto(texto, intento + 1);
+    }
     throw new Error("No se pudo traducir el texto.");
   }
 
   const datos = await respuesta.json();
-  return datos.ingles;
+  if (datos.responseStatus !== 200 && datos.responseStatus !== "200") {
+    throw new Error(datos.responseDetails || "La API de traducción no respondió bien.");
+  }
+
+  return limpiarTraduccion(datos.responseData.translatedText);
 }
 
+// pedirAudio() sigue llamando a nuestro propio servidor, porque generar la
+// voz sí necesita correr en Python (con la librería edge-tts).
 async function pedirAudio(texto) {
   const respuesta = await fetch("/api/hablar", {
     method: "POST",

@@ -1,19 +1,24 @@
 """
 Traductor por voz Español -> Inglés
 ------------------------------------
-Servidor Flask que expone dos endpoints, cada uno apoyado en una API externa:
+Servidor Flask. Expone dos endpoints, cada uno apoyado en una API externa:
   - /api/traducir : recibe texto en español y devuelve la traducción al inglés,
                      pidiéndosela a la API gratuita de MyMemory Translation.
+                     Ya NO lo usa la página (ver nota abajo); se deja andando
+                     por si se quiere volver a llamar desde el servidor.
   - /api/hablar    : recibe texto en inglés y devuelve un audio con voz
                      masculina neuronal, generado por la API de edge-tts.
 
 El micrófono y el reconocimiento de voz en español ocurren en el navegador
 (Web Speech API), en estaticos/js/script.js. Este servidor no graba audio ni
-carga ningún modelo de IA en memoria: solo reenvía el texto a esas dos APIs
-y entrega la respuesta. (Antes la traducción corría con un modelo local,
-pero eso hacía que el servidor se quedara sin memoria en Render y en Railway,
-así que se volvió a una API para que el proyecto sea liviano en cualquier
-plataforma gratuita.)
+carga ningún modelo de IA en memoria.
+
+Nota sobre la traducción: la página (estaticos/js/script.js) llama a MyMemory
+directamente desde el navegador de quien la visita, en vez de pasar por este
+servidor. Así cada visitante usa su propia conexión, y no comparte el límite
+de uso diario de MyMemory con los demás proyectos que corren en el mismo
+hosting gratuito (eso causaba errores 429 intermitentes cuando la traducción
+pasaba por el servidor).
 """
 
 import asyncio
