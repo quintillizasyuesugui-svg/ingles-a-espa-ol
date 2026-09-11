@@ -21,6 +21,7 @@ import html
 import os
 import tempfile
 import threading
+import time
 
 import edge_tts
 import requests
@@ -49,34 +50,43 @@ def traducir():
     if not texto:
         return jsonify({"error": "El texto está vacío."}), 400
 
-    try:
-        respuesta = requests.get(
-            URL_API_TRADUCCION,
-            # El parámetro "de" (un contacto, no hace falta que sea real) le
-            # sube el límite diario gratis a MyMemory. Sin esto, la IP
-            # compartida de un plan gratis de hosting puede toparse con el
-            # límite anónimo mucho más rápido.
-            params={"q": texto, "langpair": "es|en", "de": "traductor-voz@example.com"},
-            timeout=10,
-        )
-        respuesta.raise_for_status()
-        datos_api = respuesta.json()
+    # La IP compartida de un plan gratis de hosting a veces topa el límite de
+    # uso anónimo de MyMemory (error 429). Muchas veces es pasajero, así que
+    # antes de rendirse se reintenta un par de veces con una pequeña espera.
+    ultimo_error = None
+    for intento in range(3):
+        try:
+            respuesta = requests.get(
+                URL_API_TRADUCCION,
+                # El parámetro "de" (un contacto, no hace falta que sea real)
+                # le sube el límite diario gratis a MyMemory.
+                params={"q": texto, "langpair": "es|en", "de": "traductor-voz@example.com"},
+                timeout=10,
+            )
+            respuesta.raise_for_status()
+            datos_api = respuesta.json()
 
-        estado = datos_api.get("responseStatus")
-        if estado not in (200, "200"):
-            raise ValueError(datos_api.get("responseDetails", "respuesta inesperada de la API"))
+            estado = datos_api.get("responseStatus")
+            if estado not in (200, "200"):
+                raise ValueError(datos_api.get("responseDetails", "respuesta inesperada de la API"))
 
-        # MyMemory junta traducciones hechas por usuarios, así que a veces
-        # vienen con código HTML sin limpiar (por ejemplo "&#10;" en vez de
-        # un salto de línea real) o con saltos de línea/espacios de más.
-        # html.unescape() lo pasa a texto normal, y split()+join() lo deja
-        # todo en una sola línea.
-        traduccion_bruta = html.unescape(datos_api["responseData"]["translatedText"])
-        traduccion = " ".join(traduccion_bruta.split())
-    except (requests.RequestException, KeyError, ValueError) as error:
-        return jsonify({"error": f"No se pudo traducir el texto: {error}"}), 502
+            # MyMemory junta traducciones hechas por usuarios, así que a veces
+            # vienen con código HTML sin limpiar (por ejemplo "&#10;" en vez
+            # de un salto de línea real) o con saltos de línea/espacios de
+            # más. html.unescape() lo pasa a texto normal, y split()+join()
+            # lo deja todo en una sola línea.
+            traduccion_bruta = html.unescape(datos_api["responseData"]["translatedText"])
+            traduccion = " ".join(traduccion_bruta.split())
+            return jsonify({"espanol": texto, "ingles": traduccion})
+        except (requests.RequestException, KeyError, ValueError) as error:
+            ultimo_error = error
+            es_limite = isinstance(error, requests.HTTPError) and error.response is not None and error.response.status_code == 429
+            if es_limite and intento < 2:
+                time.sleep(1.5 * (intento + 1))
+                continue
+            break
 
-    return jsonify({"espanol": texto, "ingles": traduccion})
+    return jsonify({"error": f"No se pudo traducir el texto: {ultimo_error}"}), 502
 
 
 # Genera el audio en inglés (voz masculina) y lo entrega al navegador.
