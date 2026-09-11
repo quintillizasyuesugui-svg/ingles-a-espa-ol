@@ -14,11 +14,6 @@ También hay dos botones independientes para probar cada función por separado:
 - **Traducir** → le pide la traducción a la API de MyMemory.
 - **🔊 Escuchar** → llama a `/api/hablar` en el servidor (API de edge-tts).
 
-Junto al botón "🔊 Escuchar" hay un **interruptor 🔌 "API de voz"**:
-
-- **Activado (por defecto):** al escuchar, sí se llama a la API de edge-tts y se reproduce el audio.
-- **Desactivado:** no se llama a la API — ni el botón "Escuchar" ni el flujo automático del micrófono reproducen audio, y se avisa que la API está apagada.
-
 **Por qué la traducción la pide el navegador y no el servidor:** al principio el servidor era el que llamaba a MyMemory, pero en un hosting gratuito (Render, Railway, etc.) muchos proyectos distintos comparten la misma dirección IP de salida, y entre todos agotan rápido el límite de uso gratis de MyMemory — causando errores intermitentes que no tienen que ver con este código. Al pedirla desde el navegador, cada visitante usa su propia conexión a internet y su propio límite.
 
 El servidor no carga ningún modelo de IA, así que el proyecto es liviano y funciona bien en cualquier plan gratuito.
